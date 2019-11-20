@@ -41,13 +41,13 @@ mkfile_dir := $(shell cd $(shell dirname $(mkfile_path)); pwd)
 TOOLS_DESTDIR  ?= $(GOPATH)/bin
 
 CERTSTRAP     = $(TOOLS_DESTDIR)/certstrap
-PROTOBUF     	= $(TOOLS_DESTDIR)/protoc
 GOX						= $(TOOLS_DESTDIR)/gox
 GOODMAN 			= $(TOOLS_DESTDIR)/goodman
+PROTOBUF     	= $(TOOLS_DESTDIR)/protoc
 
 all: tools
 
-tools: certstrap protobuf gox goodman
+tools: certstrap gox goodman protobuf
 
 check: check_tools
 
@@ -61,9 +61,28 @@ $(CERTSTRAP):
 	@echo "Get Certstrap"
 	@go get github.com/square/certstrap@v1.2.0
 
+# Choose protobuf binary based on OS.
+PROTOC_ZIP=""
+ifneq ($(OS),Windows_NT)
+		UNAME_S := $(shell uname -s)
+		ifeq ($(UNAME_S),Linux)
+			PROTOC_ZIP="protoc-3.10.1-linux-x86_64.zip"
+		endif
+		ifeq ($(UNAME_S),Darwin)
+				PROTOC_ZIP="protoc-3.10.1-osx-x86_64.zip"
+		endif
+endif
+
 protobuf: $(PROTOBUF)
 $(PROTOBUF):
-	@echo "Get Protobuf"
+	@echo "Get Protobuf (may require sudo)"
+	@echo "In case of any errors, install directly from https://github.com/protocolbuffers/protobuf/releases"
+	@curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.10.1/$(PROTOC_ZIP)
+	@sudo unzip -o $(PROTOC_ZIP) -d /usr/local bin/protoc
+	@sudo chown $(USER) /usr/local/bin/protoc
+	@sudo unzip -o $(PROTOC_ZIP) -d /usr/local 'include/*'
+	@rm -f $(PROTOC_ZIP)
+	@echo "Get GoGo Protobuf"
 	@go get github.com/gogo/protobuf/protoc-gen-gogo@v1.3.1
 
 # used to build tm-monitor binaries
@@ -78,7 +97,7 @@ $(GOODMAN):
 	@go get github.com/snikch/goodman/cmd/goodman@10e37e294daa3c9a90abded60ff9924bafab3888
 
 tools-clean:
-	rm -f $(CERTSTRAP) $(PROTOBUF) $(GOX) $(GOODMAN)
+	rm -f $(CERTSTRAP) $(GOX) $(GOODMAN) $(PROTOBUF)
 	rm -f tools-stamp
 
 .PHONY: all tools tools-clean
